@@ -18,12 +18,16 @@
  */
 
 import { beforeAll, describe, expect, it } from 'vitest'
+import { mkdtemp, writeFile } from 'node:fs/promises'
+import { tmpdir } from 'node:os'
+import { join } from 'node:path'
 import type { ZoteroHttpClient } from '../../src/http-client.js'
 import type { ZoteroWriteHttpClient } from '../../src/write-http.js'
 import { WriteAuthorizer } from '../../src/write-auth.js'
 import { PERSONAL_LIBRARY } from '../../src/refs.js'
 import { resolveCollectionsMixed, ScopeDirectory } from '../../src/local/scope-directory.js'
 import { createItem } from '../../src/local/write-domain.js'
+import { attachFile } from '../../src/local/write-attachments.js'
 import type { WriteDomainDeps } from '../../src/local/write-deps.js'
 import { createNote, updateNote } from '../../src/local/write-notes.js'
 import { restoreItems } from '../../src/local/write-library-maintenance.js'
@@ -186,6 +190,38 @@ describe.runIf(process.env.ZOTERO_INTEGRATION === '1' && process.env.ZOTERO_WRIT
       const saved = await read()
       expect(Boolean(saved.deleted)).toBe(false)
       expect(saved.parentItem).toBe(parent.key)
+    })
+
+    it('attaches a local file and registers its bytes through the file protocol', async () => {
+      const parent = await createItem(deps, {
+        itemType: 'document',
+        title: 'dsh-zotero attachment probe',
+        collections: [PROBE_COLLECTION],
+      })
+      if (parent.kind !== 'applied') throw new Error('attachment parent creation was not verified')
+      const dir = await mkdtemp(join(tmpdir(), 'dsh-zotero-attach-probe-'))
+      const path = join(dir, 'probe.pdf')
+      const bytes = '%PDF-1.4\n% dsh-zotero attachment probe\n'
+      await writeFile(path, bytes)
+      const attached = await attachFile(deps, {
+        item: { library: PERSONAL_LIBRARY, kind: 'item', key: parent.key },
+        path,
+        title: 'Attachment probe PDF',
+      })
+      expect(attached.kind).toBe('applied')
+      if (attached.kind !== 'applied') throw new Error('attachment was not verified')
+      expect(attached.bytes).toBe(Buffer.byteLength(bytes))
+      expect(attached.filename).toBe('probe.pdf')
+      expect(attached.contentType).toBe('application/pdf')
+      const saved = await client.getJson<{ data?: Record<string, unknown> }>(
+        `users/0/items/${attached.key}`,
+        undefined,
+        {},
+      )
+      const data = saved.json.data ?? {}
+      expect(data.parentItem).toBe(parent.key)
+      expect(data.filename).toBe('probe.pdf')
+      expect(data.contentType).toBe('application/pdf')
     })
 
     it('advances the library version the read client sees', async () => {
