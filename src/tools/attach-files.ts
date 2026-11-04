@@ -109,11 +109,18 @@ const OUTPUT = {
 } as const
 type Output = InferValue<typeof OUTPUT>
 
+/**
+ * One attachment receipt as the output schema models it: the service result
+ * without its domain `kind` tag (the batch already says `attached`, and a
+ * second `kind` would violate the schema's closed shape).
+ */
+type AttachedFileReceipt = Omit<ZoteroAttachFileResult, 'kind'>
+
 /** The tool's own outcome vocabulary: service outcomes plus the batch envelope. */
 type AttachFilesOutcome =
   | { kind: 'declined' }
   | ZoteroWriteCommittedUnverified
-  | { kind: 'attached'; attachments: ZoteroAttachFileResult[]; serverId?: string }
+  | { kind: 'attached'; attachments: AttachedFileReceipt[]; serverId?: string }
 
 /** The deterministic plan markdown the approval card renders. */
 export function attachFilesPlan(args: Args): string {
@@ -216,13 +223,26 @@ export function registerAttachFilesTool(ctx: Context, service: ZoteroService): (
       async execute(args, exec): Promise<AttachFilesOutcome> {
         const requests = buildRequests(args)
         const plan = attachFilesPlan(args)
-        const attachments: ZoteroAttachFileResult[] = []
+        const attachments: AttachedFileReceipt[] = []
         let serverId: string | undefined
         for (const request of requests) {
           const outcome = await service.attachFile(request, { exec, plan })
           if (outcome.kind === 'declined') return { kind: 'declined' }
           if (outcome.kind === 'committed-unverified') return outcome
-          attachments.push(outcome)
+          // The output schema is closed: drop the service's `kind` tag rather
+          // than adding a second `kind` per row to the tool contract.
+          attachments.push({
+            ref: outcome.ref,
+            key: outcome.key,
+            parentRef: outcome.parentRef,
+            ...(outcome.title === undefined ? {} : { title: outcome.title }),
+            filename: outcome.filename,
+            contentType: outcome.contentType,
+            bytes: outcome.bytes,
+            version: outcome.version,
+            libraryVersion: outcome.libraryVersion,
+            ...(outcome.serverId === undefined ? {} : { serverId: outcome.serverId }),
+          })
           serverId = outcome.serverId
         }
         return {
