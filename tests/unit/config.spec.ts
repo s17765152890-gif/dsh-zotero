@@ -33,6 +33,7 @@ describe('resolveConfig', () => {
       defaultLocale: 'en-US',
       writeEnabled: false,
       writePersistKey: true,
+      writeAutoApprove: false,
       writeNoteMaxChars: 65_536,
       writeListMaxItems: 50,
       writeAuthorizeDeadlineMs: 120_000,
