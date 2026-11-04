@@ -86,7 +86,7 @@ Optional `style` and `locale` parameters set the citation format. The five non-`
 
 ## Optional Personal-Library Writes
 
-When `writeEnabled` is turned on, the plugin registers 15 write tools restricted to the personal library (`zotero://user/0/`):
+When `writeEnabled` is turned on, the plugin registers 16 write tools restricted to the personal library (`zotero://user/0/`):
 
 - `zotero_create_note`: creates standalone notes or child notes with tags, collections, and `dc:relation` links;
 - `zotero_update_note`: replaces an existing note body under its version precondition;
@@ -101,6 +101,7 @@ When `writeEnabled` is turned on, the plugin registers 15 write tools restricted
 - `zotero_create_saved_search` / `zotero_update_saved_search` / `zotero_delete_saved_search`: manage saved-search definitions;
 - `zotero_delete_library_tags`: deletes tags library-wide by name (irreversible), stating each tag's item count first; unmatched names are ignored so a retry is idempotent;
 - `zotero_batch_items`: creates items, updates tags and collections, and moves items to trash in a single call under one plan card.
+- `zotero_attach_files`: creates an imported-file attachment from a local path and uploads it through Zotero 10's three-phase file protocol.
 
 Every write requires passing session approval policy and plan card review. Deletion cards state whether items are moved to trash or removed permanently. Zotero 10 also prompts a local authorization dialog on first write.
 
@@ -115,7 +116,7 @@ In DSH conversations, Zotero tool calls render using dedicated read-only cards (
 - **Child Objects (`zotero_children`)**: partitions child notes, attachments, and highlighted PDF annotations by kind;
 - **Library Structure & Changes (`zotero_browse` / `zotero_changes`)**: `zotero_browse` renders collection trees and tag lists; `zotero_changes` displays versioned diffs, deletions, and reusable cursors;
 - **Attachment Locator (`zotero_attachment`)**: displays verified file paths or links with one-click copy and open actions;
-- **Personal Library Writes (all 15 write tools)**: displays target items, note summaries, planned tag and membership changes, collection/item creation and deletion, Trash restoration, saved-search operations, and library-wide tag deletion; receipts distinguish "applied", "no change", "outcome unreported", and "declined", with irreversible deletes declared on the plan card first.
+- **Personal Library Writes (all 16 write tools)**: displays target items, note summaries, planned tag and membership changes, collection/item creation and deletion, Trash restoration, saved-search operations, and library-wide tag deletion; receipts distinguish "applied", "no change", "outcome unreported", and "declined", with irreversible deletes declared on the plan card first.
 
 Cards use compact summary headers by default and lazily render details when expanded, tracking tool lifecycle states throughout execution.
 

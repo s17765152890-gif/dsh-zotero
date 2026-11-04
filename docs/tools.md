@@ -2,7 +2,7 @@
 
 # 工具参考
 
-dsh-zotero 注册 23 个本地工具（8 个读工具 + 15 个写工具），通过本地 Zotero HTTP API 与文献库交互。其中 15 个写入工具默认关闭，需在设置中显式启用 `writeEnabled`，且只操作个人库（`zotero://user/0/`）。学术文献工具属于单独的 Scholarly 组件，随包发布但默认关闭；启用该组件即启用这些工具。所有文献引用（ref）均为 `zotero://user/0/item/<KEY>`（个人库）或 `zotero://group/<ID>/item/<KEY>`（群组库）格式的稳定标识符。
+dsh-zotero 注册 25 个本地工具（9 个读工具 + 16 个写工具），通过本地 Zotero HTTP API 与文献库交互。其中 15 个写入工具默认关闭，需在设置中显式启用 `writeEnabled`，且只操作个人库（`zotero://user/0/`）。学术文献工具属于单独的 Scholarly 组件，随包发布但默认关闭；启用该组件即启用这些工具。所有文献引用（ref）均为 `zotero://user/0/item/<KEY>`（个人库）或 `zotero://group/<ID>/item/<KEY>`（群组库）格式的稳定标识符。
 
 ### 交互卡片（Toolviews）
 
@@ -136,6 +136,32 @@ zotero_retrieve(ref="zotero://user/0/item/ABC123", query="attention mechanism", 
 
 ```text
 zotero_attachment(ref="zotero://user/0/item/ABC123")
+```
+
+---
+
+## zotero_bilingual_document
+
+把条目本地 PDF 变成「原文｜中文」左右对照双语阅读文档（自包含 HTML + Markdown 镜像）：逐段翻译正文、标题、图题与图/表内标签文字，译文用当前 DSH 会话模型（`ctx.llm`）。翻译按段分批、结果缓存到输出目录旁，重跑可续译；图内文字随图题挂在页面对应位置。
+
+### 参数
+
+| 参数        | 类型    | 必填 | 说明                                                                   |
+| ----------- | ------- | ---- | ---------------------------------------------------------------------- |
+| `ref`       | string  | ✓    | 条目 ref（个人库或群组库），解析到该条目的最佳本地 PDF              |
+| `pages`     | string  | —    | 页码范围如 `"3"`、`"1-5"`、`"2-"`，缺省整篇                            |
+| `lang`      | string  | —    | 目标语言标签，缺省配置 `bilingualTargetLang`（`zh-CN`）               |
+| `maxUnits`  | integer | —    | 翻译上限，快速预览长文时用                                            |
+| `outputDir` | string  | —    | 输出根目录，缺省配置 `bilingualOutputDir` 或会话工作目录下 `bilingual` |
+
+### 输出
+
+`{kind: "generated", htmlPath, markdownPath, cachePath, pageCount, units, translated, untranslated, figureUnits, figureFragments, requests, failures, errors, model: {provider, model}, modelSource, elapsedMs}`；`errors` 记录前 3 条翻译失败信息供排障；`modelSource` 标明路由来源（`config`/`default`/`agent`）。
+
+### 示例
+
+```text
+zotero_bilingual_document(ref="zotero://user/0/item/ABC123", pages="1-4", maxUnits=20)
 ```
 
 ---

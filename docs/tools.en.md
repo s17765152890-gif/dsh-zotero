@@ -2,7 +2,7 @@
 
 # Tool Reference
 
-dsh-zotero registers 23 local tools (8 read tools and 15 write tools) that interact with your Zotero library through the local HTTP API. The 15 write tools are disabled by default and require enabling `writeEnabled` in configuration, and they operate only on the personal library (`zotero://user/0/`). Scholarly literature tools belong to a separate component that ships with the bundle but off; enabling that component enables those tools. All item references (refs) are stable identifiers in `zotero://user/0/item/<KEY>` (personal library) or `zotero://group/<ID>/item/<KEY>` (group library) format.
+dsh-zotero registers 25 local tools (9 read tools and 16 write tools) that interact with your Zotero library through the local HTTP API. The 15 write tools are disabled by default and require enabling `writeEnabled` in configuration, and they operate only on the personal library (`zotero://user/0/`). Scholarly literature tools belong to a separate component that ships with the bundle but off; enabling that component enables those tools. All item references (refs) are stable identifiers in `zotero://user/0/item/<KEY>` (personal library) or `zotero://group/<ID>/item/<KEY>` (group library) format.
 
 ### Interactive Presentation (Toolviews)
 
@@ -136,6 +136,32 @@ Discriminated union:
 
 ```text
 zotero_attachment(ref="zotero://user/0/item/ABC123")
+```
+
+---
+
+## zotero_bilingual_document
+
+Turn an item's local PDF into a side-by-side English | Chinese reading document (self-contained HTML plus a Markdown mirror): body paragraphs, headings, captions, and figure/table label text are translated with the session's current model (`ctx.llm`). Translation is batched and cached next to the output directory so re-runs resume; figure text renders next to its caption on the same page.
+
+### Parameters
+
+| Parameter   | Type    | Required | Description                                                                      |
+| ----------- | ------- | -------- | -------------------------------------------------------------------------------- |
+| `ref`       | string  | ✓        | Item ref (personal or group library) resolving to the item's best local PDF       |
+| `pages`     | string  | —        | Page range like `"3"`, `"1-5"`, `"2-"`. Omitted means the whole PDF               |
+| `lang`      | string  | —        | Target language tag; defaults to the `bilingualTargetLang` config (`zh-CN`)      |
+| `maxUnits`  | integer | —        | Cap on translated units; useful for quick previews of long PDFs                  |
+| `outputDir` | string  | —        | Output root; defaults to the `bilingualOutputDir` config or `bilingual/` under the session workspace |
+
+### Output
+
+`{kind: "generated", htmlPath, markdownPath, cachePath, pageCount, units, translated, untranslated, figureUnits, figureFragments, requests, failures, errors, model: {provider, model}, modelSource, elapsedMs}`; `errors` carries the first three translation failures for diagnosis; `modelSource` names the route's origin (`config`/`default`/`agent`).
+
+### Example
+
+```text
+zotero_bilingual_document(ref="zotero://user/0/item/ABC123", pages="1-4", maxUnits=20)
 ```
 
 ---

@@ -4,8 +4,8 @@
 
 - [Getting Started](getting-started.en.md): Installation, prerequisites, and connection verification
 - [Features](features.en.md): Sources panel, chat integration, passage retrieval, and export workflow
-- [Tool Reference](tools.en.md): Parameters, return values, and error codes for all 23 local tools (8 read and 15 write)
-- [Configuration Reference](configuration.en.md): 37 configuration fields, default values, and hot-reload behavior
+- [Tool Reference](tools.en.md): Parameters, return values, and error codes for all 25 local tools (9 read and 16 write)
+- [Configuration Reference](configuration.en.md): 43 configuration fields, default values, and hot-reload behavior
 - [Architecture](architecture.en.md): Data flow, layer responsibilities, and design boundaries
 - [Development Guide](development.en.md): Build, test, local development, and release workflow
 - [Scenarios](scenarios.en.md): Real-conversation acceptance cases and everyday usage prompts

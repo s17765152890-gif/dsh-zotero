@@ -41,6 +41,11 @@
 | `writeNoteMaxChars`        | `65536`                      | 单条研究笔记正文字符上限                                                                                                                                                      |
 | `writeListMaxItems`        | `50`                         | 列表类写入参数的条目上限：`update_item_tags`/`update_item_collections` 的 `add`/`remove`、`delete_library_tags` 的 `tags`、`create_note` 的 `collections`/`tags`/`sourceRefs` |
 | `writeAuthorizeDeadlineMs` | `120000`                     | 写入时等待 Zotero 授权弹窗的时限（毫秒）                                                                                                                                      |
+| `bilingualProvider`        | `""`                         | 双语翻译用的 provider 路由；为空时取 Harness 默认选择                                                                                                                         |
+| `bilingualModel`           | `""`                         | 双语翻译用的模型 id；为空时取 Harness 默认选择                                                                                                                                |
+| `bilingualTargetLang`      | `zh-CN`                      | 双语文档目标语言                                                                                                                                                                |
+| `bilingualOutputDir`       | `""`                         | 双语文档输出根目录；为空时用会话工作目录下 `bilingual` 文件夹                                                                                                                |
+| `bilingualBatchChars`      | `6000`                       | 每次翻译请求的最大原文字符数                                                                                                                                                  |
 | `webEnabled`               | `true`                       | 是否在 DSH Web 中启用 Zotero 会话标签页与侧边栏文献库面板                                                                                                                     |
 | `enableRunInBackground`    | `true`                       | 是否允许 `run_in_background: true` 的请求进入后台执行（参数恒声明，关闭时传 `true` 返回结构化拒绝）                                                                           |
 | `promoteOnTimeout`         | `true`                       | 前台导出或变更同步超时时是否自动提升为后台任务                                                                                                                                |
@@ -59,7 +64,7 @@
 - `baseUrl` 主机名必须为环回地址（`127.0.0.1`、`localhost`、`::1`、`[::1]`）；`localhost` 在运行时解析为 `127.0.0.1`；
 - `baseUrl` 路径必须为 `/api` 或以 `/api/` 开头；
 - `timeoutMs` 必须为正有限数；
-- 其余数值字段（并发、各类上限、`scopeListingTtlMs`、`foregroundWaitMs`、`writeNoteMaxChars`、`writeListMaxItems`、`writeAuthorizeDeadlineMs`）均必须为正整数；
+- 其余数值字段（并发、各类上限、`scopeListingTtlMs`、`foregroundWaitMs`、`writeNoteMaxChars`、`writeListMaxItems`、`writeAuthorizeDeadlineMs`、`bilingualBatchChars`）均必须为正整数；
 - `writeEnabled`、`writePersistKey`、`writeAutoApprove`、`webEnabled`、`enableRunInBackground`、`promoteOnTimeout` 与 `debug` 必须为布尔值；
 - `provider`、`defaultStyle` 与 `defaultLocale` 必须为非空字符串。
 

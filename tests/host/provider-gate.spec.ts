@@ -6,6 +6,7 @@ import ZoteroService, { type ZoteroService as ZoteroServiceType } from '../../sr
 import { ZOTERO_CAPABILITY_UNAVAILABLE, ZOTERO_PROVIDER_UNAVAILABLE } from '../../src/errors.js'
 import type { ZoteroProvider, ZoteroSearchResult } from '../../src/types.js'
 import { MockZotero } from '../helpers/mock-zotero.js'
+import { StubLlm } from '../helpers/stub-llm.js'
 import { zoteroError } from '../helpers/provider-harness.js'
 import { parseRef } from '../../src/refs.js'
 
@@ -34,6 +35,7 @@ async function boot(providerId: string): Promise<ZoteroServiceType> {
   ctx = new Context()
   await ctx.plugin(SystemPrompt, {})
   await ctx.plugin(ToolRuntime, {})
+  await ctx.plugin(StubLlm, undefined)
   await ctx.plugin(ZoteroService, { baseUrl: mock.baseUrl, provider: providerId })
   return ctx.zotero
 }
