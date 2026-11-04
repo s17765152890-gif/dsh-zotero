@@ -23,7 +23,7 @@ import ToolRuntime, {
 import { afterAll, beforeAll, describe, expect, it } from 'vitest'
 import ZoteroService from '../../src/index.js'
 import { TestJobRegistry } from '../helpers/fake-jobs.js'
-import { StubLlm } from '../helpers/stub-llm.js'
+import { StubLlm, StubDefaultModel } from '../helpers/stub-llm.js'
 
 /**
  * The repo root, resolved from this spec's own location. Resolving from
@@ -167,6 +167,7 @@ describe('documented tool calls match the tool schemas', () => {
     await ctx.plugin(ToolRuntime, {})
     await ctx.plugin(TestJobRegistry)
     await ctx.plugin(StubLlm, undefined)
+    await ctx.plugin(StubDefaultModel, undefined)
     await ctx.plugin(ZoteroService, {
       baseUrl: 'http://127.0.0.1:23119/api',
       // The write tools document real examples; the gate validates them

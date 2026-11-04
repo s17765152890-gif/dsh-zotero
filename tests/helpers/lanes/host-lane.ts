@@ -37,7 +37,7 @@ import type { Options } from '../../../src/config.js'
 import ZoteroService from '../../../src/index.js'
 import { MockZotero } from '../mock-zotero.js'
 import { StubCommands } from '../stub-commands.js'
-import { StubLlm } from '../stub-llm.js'
+import { StubLlm, StubDefaultModel } from '../stub-llm.js'
 
 /** The optional services a lane composes before the plugin mounts. */
 export interface HostLaneOptions {
@@ -109,6 +109,7 @@ export async function setupHostLane(
   await ctx.plugin(SystemPrompt, {})
   await ctx.plugin(ToolRuntime, {})
   await ctx.plugin(StubLlm, undefined)
+  await ctx.plugin(StubDefaultModel, undefined)
   if (options.commands === true) await ctx.plugin(StubCommands)
   if (options.typert === true) await ctx.plugin(TypertRegistry)
   if (options.compose !== undefined) await options.compose(ctx)

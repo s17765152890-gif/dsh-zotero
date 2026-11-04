@@ -193,7 +193,7 @@ export function requireZoteroService(ctx: Context, signal?: AbortSignal): Zotero
 }
 
 export class ZoteroService extends Service {
-  static inject = ['tools', 'systemPrompt', 'llm']
+  static inject = ['tools', 'systemPrompt', 'llm', 'agentDefaultModel']
 
   static Config = ConfigSchema
 

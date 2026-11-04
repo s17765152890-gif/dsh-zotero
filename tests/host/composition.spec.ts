@@ -31,7 +31,7 @@ import { ZOTERO_LIBRARY_SETTINGS_NAMESPACE } from '../../src/contract.js'
 import { expectValue } from '../helpers/lanes/host-lane.js'
 import { MockZotero } from '../helpers/mock-zotero.js'
 import { StubCommands } from '../helpers/stub-commands.js'
-import { StubLlm } from '../helpers/stub-llm.js'
+import { StubLlm, StubDefaultModel } from '../helpers/stub-llm.js'
 import { SCHOLARLY_TOOL_NAMES, ZOTERO_READ_TOOL_NAMES } from '../helpers/tool-names.js'
 
 let root: string | undefined
@@ -68,6 +68,7 @@ async function bootComposition(extraPatches: readonly PatchOptions[] = []): Prom
       "- name: '@deepseek-ai/dsh-tools'",
       "- name: 'test-stub-commands'",
       "- name: 'test-stub-llm'",
+      "- name: 'test-stub-default-model'",
       '',
     ].join('\n'),
   )
@@ -81,6 +82,7 @@ async function bootComposition(extraPatches: readonly PatchOptions[] = []): Prom
     ['@deepseek-ai/dsh-tools', ToolRuntime],
     ['test-stub-commands', StubCommands],
     ['test-stub-llm', StubLlm],
+    ['test-stub-default-model', StubDefaultModel],
     ['dsh-zotero', ZoteroService],
     ['dsh-zotero/scholarly', ScholarlyService],
     ['dsh-zotero/library', ZoteroLibraryService],

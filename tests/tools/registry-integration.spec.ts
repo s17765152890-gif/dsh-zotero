@@ -4,7 +4,7 @@ import SystemPrompt from '@deepseek-ai/dsh-system-prompt'
 import ToolRuntime from '@deepseek-ai/dsh-tools'
 import { afterEach, beforeEach, describe, expect, it } from 'vitest'
 import ZoteroService from '../../src/index.js'
-import { StubLlm } from '../helpers/stub-llm.js'
+import { StubLlm, StubDefaultModel } from '../helpers/stub-llm.js'
 import {
   ITEM_QUERY_MODE_MESSAGE,
   ITEM_LEVEL_SCOPE_MESSAGE,
@@ -33,6 +33,7 @@ beforeEach(async () => {
   await ctx.plugin(SystemPrompt, {})
   await ctx.plugin(ToolRuntime as never, {} as never)
   await ctx.plugin(StubLlm, undefined)
+  await ctx.plugin(StubDefaultModel, undefined)
   await ctx.plugin(ZoteroService as never, { baseUrl: mock.baseUrl } as never)
 })
 
