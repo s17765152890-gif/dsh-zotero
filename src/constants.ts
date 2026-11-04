@@ -182,6 +182,7 @@ export const ZOTERO_READ_TOOL_NAMES = [
   'zotero_browse',
   'zotero_export',
   'zotero_changes',
+  'zotero_bilingual_document',
 ] as const
 
 /** Every tool the plugin can register, reads and writes together. */

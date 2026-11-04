@@ -14,6 +14,7 @@ import { registerRetrieveTool } from './tools/retrieve.js'
 import { registerSearchTool } from './tools/search.js'
 import { registerBatchItemsTool } from './tools/batch-items.js'
 import { registerAttachFilesTool } from './tools/attach-files.js'
+import { registerBilingualDocumentTool } from './tools/bilingual-document.js'
 import { registerCreateCollectionTool } from './tools/create-collection.js'
 import { registerCreateItemTool } from './tools/create-item.js'
 import { registerCreateNoteTool } from './tools/create-note.js'
@@ -36,6 +37,7 @@ export function registerReadTools(ctx: Context, service: ZoteroService): void {
   registerBrowseTool(ctx, service)
   registerExportTool(ctx, service)
   registerChangesTool(ctx, service)
+  registerBilingualDocumentTool(ctx, service)
 }
 
 export function registerWriteTools(ctx: Context, service: ZoteroService): Array<() => void> {

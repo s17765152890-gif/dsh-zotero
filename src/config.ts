@@ -107,6 +107,16 @@ export interface Config {
    * library without reviewing each plan.
    */
   writeAutoApprove?: Volatile<boolean>
+  /** Provider route used for bilingual translation; empty means the session agent's route. */
+  bilingualProvider?: Volatile<string>
+  /** Model id used for bilingual translation; empty means the session agent's model. */
+  bilingualModel?: Volatile<string>
+  /** Target language for bilingual documents (BCP-47-ish tag, defaults to zh-CN). */
+  bilingualTargetLang?: Volatile<string>
+  /** Output root for bilingual documents; empty means <session workspace>/bilingual. */
+  bilingualOutputDir?: Volatile<string>
+  /** Characters of source text sent per translation request (defaults to 6000). */
+  bilingualBatchChars?: Volatile<number>
   /** Character budget for one research note body write; the converted HTML rides the batch's successful bucket (bounded by `maxResponseBytes`), and this bound keeps one pathological note from dominating a batch. */
   writeNoteMaxChars?: Volatile<number>
   /** Upper bound for items in one tags/collection-membership write's list arguments, the same scale as the write batch cap, so one call cannot fan out into many protocol batches. */
@@ -176,6 +186,11 @@ export const Config = Schema.object({
   writeEnabled: Schema.boolean().default(false).volatile(),
   writePersistKey: Schema.boolean().default(true).volatile(),
   writeAutoApprove: Schema.boolean().default(false).volatile(),
+  bilingualProvider: Schema.string().default('').volatile(),
+  bilingualModel: Schema.string().default('').volatile(),
+  bilingualTargetLang: Schema.string().default('zh-CN').volatile(),
+  bilingualOutputDir: Schema.string().default('').volatile(),
+  bilingualBatchChars: Schema.number().default(6000).volatile(),
   writeNoteMaxChars: Schema.number().default(65_536).volatile(),
   writeListMaxItems: Schema.number().default(50).volatile(),
   writeAuthorizeDeadlineMs: Schema.number().default(120_000).volatile(),
@@ -217,6 +232,11 @@ export interface ResolvedConfig {
   readonly writeEnabled: boolean
   readonly writePersistKey: boolean
   readonly writeAutoApprove: boolean
+  readonly bilingualProvider: string
+  readonly bilingualModel: string
+  readonly bilingualTargetLang: string
+  readonly bilingualOutputDir: string
+  readonly bilingualBatchChars: number
   readonly writeNoteMaxChars: number
   readonly writeListMaxItems: number
   readonly writeAuthorizeDeadlineMs: number
