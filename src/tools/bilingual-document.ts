@@ -68,6 +68,7 @@ const OUTPUT = {
     figureFragments: { type: 'integer', required: true },
     requests: { type: 'integer', required: true },
     failures: { type: 'integer', required: true },
+    errors: { type: 'array', required: true, items: { type: 'string' } },
     model: {
       type: 'object',
       additionalProperties: false,
@@ -77,6 +78,7 @@ const OUTPUT = {
         model: { type: 'string', required: true },
       },
     },
+    modelSource: { type: 'string', required: true },
     elapsedMs: { type: 'integer', required: true },
   },
 } as const
@@ -104,21 +106,17 @@ function sessionWorkspace(exec: { agent?: { session?: { header?: { cwd?: string 
 }
 
 /** Resolve the model route: explicit config, then the session agent, then the default selection. */
+/** Resolve the model route; explicit config wins, then the harness default, then the session agent. */
 function resolveModel(
   ctx: Context,
   service: ZoteroService,
   exec: { agent?: { options?: { provider?: string; model?: string; reasoningEffort?: unknown } } },
-): ModelSelection {
+): { selection: ModelSelection; source: 'config' | 'default' | 'agent' } {
   const config = service.config
-  const agentOptions = exec.agent?.options
-  const provider = config.bilingualProvider !== '' ? config.bilingualProvider : agentOptions?.provider
-  const model = config.bilingualModel !== '' ? config.bilingualModel : agentOptions?.model
-  if (provider !== undefined && provider !== '' && model !== undefined && model !== '') {
-    const effort = agentOptions?.reasoningEffort
+  if (config.bilingualProvider !== '' && config.bilingualModel !== '') {
     return {
-      provider,
-      model,
-      ...(typeof effort === 'string' ? { reasoningEffort: effort as never } : {}),
+      selection: { provider: config.bilingualProvider, model: config.bilingualModel },
+      source: 'config',
     }
   }
   const defaults = (
@@ -127,7 +125,24 @@ function resolveModel(
     }
   ).agentDefaultModel
   const fallback = defaults?.currentSelection?.()
-  if (fallback !== undefined) return fallback
+  if (fallback !== undefined) return { selection: fallback, source: 'default' }
+  const agentOptions = exec.agent?.options
+  if (
+    agentOptions?.provider !== undefined &&
+    agentOptions.provider !== '' &&
+    agentOptions?.model !== undefined &&
+    agentOptions.model !== ''
+  ) {
+    const effort = agentOptions.reasoningEffort
+    return {
+      selection: {
+        provider: agentOptions.provider,
+        model: agentOptions.model,
+        ...(typeof effort === 'string' ? { reasoningEffort: effort as never } : {}),
+      },
+      source: 'agent',
+    }
+  }
   throw new ZoteroError(
     'No model route is available: set bilingualProvider/bilingualModel in the plugin config or select a model in the session.',
     ZOTERO_UNEXPECTED,
@@ -142,7 +157,8 @@ function renderBilingual(_args: Args, value: Output): ContentBlock[] {
     `Markdown: ${value.markdownPath}`,
     `Pages: ${value.pageCount} · units: ${value.units} (translated ${value.translated}, untranslated ${value.untranslated})`,
     `Figure units: ${value.figureUnits} (${value.figureFragments} label fragments)`,
-    `Model: ${model} · LLM requests: ${value.requests} (failures ${value.failures}) · ${value.elapsedMs} ms`,
+    `Model: ${model} (via ${value.modelSource}) · LLM requests: ${value.requests} (failures ${value.failures}) · ${value.elapsedMs} ms`,
+    ...(value.errors.length > 0 ? [`Translation errors: ${value.errors.join(' | ')}`] : []),
   ]
   return [{ type: 'text', text: lines.join('\n') }]
 }
@@ -198,7 +214,7 @@ export function registerBilingualDocumentTool(ctx: Context, service: ZoteroServi
           (service.config.bilingualOutputDir !== ''
             ? service.config.bilingualOutputDir
             : join(sessionWorkspace(exec as never), 'bilingual'))
-        const model = resolveModel(ctx, service, exec as never)
+        const resolved = resolveModel(ctx, service, exec as never)
         try {
           const built = await buildBilingualDocument({
             pdfPath: location.path,
@@ -207,7 +223,7 @@ export function registerBilingualDocumentTool(ctx: Context, service: ZoteroServi
             itemKey: 'key' in ref ? ref.key : 'item',
             outputRoot,
             llm: ctx.llm as unknown as LlmRuntime,
-            model,
+            model: resolved.selection,
             targetLang,
             sourceLang: 'English',
             ...range,
@@ -230,7 +246,9 @@ export function registerBilingualDocumentTool(ctx: Context, service: ZoteroServi
             figureFragments: built.figureFragments,
             requests: built.requests,
             failures: built.failures,
+            errors: built.errors,
             model: built.model,
+            modelSource: resolved.source,
             elapsedMs: built.elapsedMs,
           } satisfies Output
         } catch (error) {

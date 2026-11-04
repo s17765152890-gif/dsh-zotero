@@ -47,6 +47,8 @@ export interface BilingualBuildResult {
   figureFragments: number
   requests: number
   failures: number
+  /** First few translation errors, for diagnosis. */
+  errors: string[]
   model: { provider: string; model: string }
   elapsedMs: number
 }
@@ -130,15 +132,20 @@ export async function buildBilingualDocument(
     'utf8',
   )
 
-  // Reassemble figure-unit translations from their label pieces.
+  // Reassemble figure-unit translations from their label pieces. A figure
+  // unit counts as translated only when at least one label was translated.
   const perUnit = new Map<string, string>()
+  const figureTranslated = new Set<string>()
   for (const page of extracted.pages) {
     for (const unit of page.units) {
       if (unit.kind === 'figure') {
         const ids = figureLabelIds.get(unit.id) ?? []
         const labels = unit.text.split(' · ').filter((label) => label !== '')
-        const parts = ids.map((id, index) => translations[id] ?? labels[index] ?? '')
-        perUnit.set(unit.id, parts.join(' · '))
+        const known = ids.map((id, index) => translations[id] ?? labels[index] ?? '')
+        if (ids.some((id) => translations[id] !== undefined)) {
+          figureTranslated.add(unit.id)
+          perUnit.set(unit.id, known.join(' · '))
+        }
       } else {
         const value = translations[unit.id]
         if (value !== undefined) perUnit.set(unit.id, value)
@@ -183,6 +190,7 @@ export async function buildBilingualDocument(
     figureFragments: extracted.figureFragments,
     requests: translation.requests,
     failures: translation.failures,
+    errors: translation.errors,
     model: input.model,
     elapsedMs: Date.now() - started,
   }

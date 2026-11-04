@@ -18,6 +18,8 @@ export interface TranslateResult {
   translations: Map<string, string>
   requests: number
   failures: number
+  /** First few error messages encountered, for diagnosis. */
+  errors: string[]
 }
 
 export interface TranslateOptions {
@@ -49,6 +51,11 @@ export async function translateUnits(
   const batchUnits = Math.max(1, options.batchUnits ?? 20)
   let requests = 0
   let failures = 0
+  const errors: string[] = []
+  const noteError = (error: unknown): void => {
+    if (errors.length >= 3) return
+    errors.push(error instanceof Error ? `${error.name}: ${error.message}`.slice(0, 300) : String(error).slice(0, 300))
+  }
 
   let batch: TranslateUnit[] = []
   let chars = 0
@@ -61,8 +68,9 @@ export async function translateUnits(
       const map = await translateBatch(llm, selection, current, options)
       for (const [id, text] of map) translations.set(id, text)
       requests += 1
-    } catch {
+    } catch (error) {
       failures += 1
+      noteError(error)
       // Split once: a malformed or truncated answer usually means one unit
       // dominated the response.
       if (current.length > 1) {
@@ -72,8 +80,9 @@ export async function translateUnits(
             const map = await translateBatch(llm, selection, part, options)
             for (const [id, text] of map) translations.set(id, text)
             requests += 1
-          } catch {
+          } catch (partError) {
             failures += 1
+            noteError(partError)
           }
         }
       }
@@ -88,7 +97,7 @@ export async function translateUnits(
     chars += unit.text.length
   }
   await flush()
-  return { translations, requests, failures }
+  return { translations, requests, failures, errors }
 }
 
 /** One request: system+user prompts in, parsed id→translation map out. */
