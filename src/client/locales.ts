@@ -161,6 +161,9 @@ export const en = {
   writePersistKey: 'Remember the Zotero write key',
   writePersistKeyHint:
     'Stores an "Always Allow" key from the Zotero dialog so writes stop asking every time. One-time approvals are never stored.',
+  writeAutoApprove: 'One-click writes (skip the plan card)',
+  writeAutoApproveHint:
+    'Fork-only: skips the session approval and plan-review cards and applies each write directly. Use it only when the session already runs with full trust (danger-full-access); every write still goes through Zotero authorization.',
   writeNoteMaxChars: 'Note body cap',
   writeNoteMaxCharsHint: 'Most characters one research note body may carry.',
   writeListMaxItems: 'Write list cap',
@@ -800,6 +803,9 @@ export const zh: Record<ZoteroLocaleKey, string> = {
   writePersistKey: '记住 Zotero 写入授权',
   writePersistKeyHint:
     '保存 Zotero 弹窗里「始终允许」的授权密钥，之后写入不再反复弹窗。一次性授权不会保存。',
+  writeAutoApprove: '一键写入（跳过计划确认卡）',
+  writeAutoApproveHint:
+    'Fork 功能：跳过会话审批与计划审查卡，写入直接执行。仅建议在已授完全信任（danger-full-access）的会话里开启；每次写入仍会经过 Zotero 授权。',
   writeNoteMaxChars: '笔记正文字数上限',
   writeNoteMaxCharsHint: '单条研究笔记正文最多容纳的字符数。',
   writeListMaxItems: '写入列表上限',

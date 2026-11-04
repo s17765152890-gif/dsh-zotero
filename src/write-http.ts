@@ -207,13 +207,30 @@ interface ZoteroAuthorizeGrant {
 }
 
 /**
- * Per-call knobs of one write request: the serialized body, the deadline
- * (overriding the transport timeout, e.g. the human-paced authorize dialog),
- * whether a transport failure must surface as commit-unknown, and whether a
- * 413 reads as the tag-delete limit refusal.
+ * Options of one attachment file-protocol leg (authorize or register). Both
+ * are form-encoded POSTs under the ordinary local write headers; the upload
+ * byte transfer itself carries no local auth headers.
+ */
+interface ZoteroFormWriteOptions extends ZoteroWriteOptions {
+  readonly ifMatch?: string
+  readonly ifNoneMatch?: string
+  readonly commitSensitive?: boolean
+}
+
+/**
+ * Per-call knobs of one write request: the serialized body, the request's
+ * content type (JSON by default; the attachment file protocol sends form
+ * bodies), whether the path is an absolute URL (Zotero's upload receiver),
+ * whether the local write headers are omitted (the receiver authenticates
+ * nothing), the deadline (overriding the transport timeout, e.g. the
+ * human-paced authorize dialog), whether a transport failure must surface as
+ * commit-unknown, and whether a 413 reads as the tag-delete limit refusal.
  */
 interface WriteSendOptions {
-  readonly body?: string
+  readonly body?: string | Uint8Array
+  readonly contentType?: string
+  readonly absoluteUrl?: boolean
+  readonly omitWriteHeaders?: boolean
   readonly deadlineMs?: number
   readonly commitSensitive?: boolean
   readonly tagDeleteLimit?: boolean
@@ -327,6 +344,47 @@ export class ZoteroWriteHttpClient {
   }
 
   /**
+   * POST one form-encoded write request. Used by the attachment file protocol:
+   * the authorize leg (`md5`, `filename`, `filesize`, `mtime`, `contentType`
+   * under `If-None-Match: *`) and the register leg (`upload=<uploadKey>`).
+   */
+  async postForm(
+    path: string,
+    form: Readonly<Record<string, string>>,
+    opts: ZoteroFormWriteOptions,
+  ): Promise<{ status: number; body: string; headers: Headers }> {
+    const extraHeaders: Record<string, string> = {}
+    if (opts.ifMatch !== undefined) extraHeaders['If-Match'] = opts.ifMatch
+    if (opts.ifNoneMatch !== undefined) extraHeaders['If-None-Match'] = opts.ifNoneMatch
+    return await this.send(path, 'POST', opts, extraHeaders, {
+      body: new URLSearchParams(form).toString(),
+      contentType: 'application/x-www-form-urlencoded',
+      commitSensitive: opts.commitSensitive,
+    })
+  }
+
+  /**
+   * POST raw file bytes to the absolute upload URL Zotero returned from the
+   * authorize leg. The receiver authenticates nothing (the one-hour upload
+   * key in the URL is the capability), so no local write headers ride here.
+   */
+  async upload(
+    url: string,
+    bytes: Uint8Array,
+    contentType: string,
+    opts: { readonly signal?: AbortSignal },
+  ): Promise<{ status: number; body: string }> {
+    const { status, body } = await this.send(
+      url,
+      'POST',
+      { signal: opts.signal, serverId: '', apiKey: '' },
+      {},
+      { body: bytes, contentType, absoluteUrl: true, omitWriteHeaders: true },
+    )
+    return { status, body }
+  }
+
+  /**
    * Request a local write key. Zotero shows its user a dialog: Allow (the
    * key works once, then is consumed), Always Allow (persistent), or Deny.
    * A denial and every other refusal arrive as `ZoteroError`s with
@@ -365,28 +423,34 @@ export class ZoteroWriteHttpClient {
     extraHeaders: Record<string, string>,
     {
       body,
+      contentType = 'application/json',
+      absoluteUrl = false,
+      omitWriteHeaders = false,
       deadlineMs = this.options.timeoutMs,
       commitSensitive = false,
       tagDeleteLimit = false,
     }: WriteSendOptions = {},
-  ): Promise<{ body: string; headers: Headers }> {
-    if (opts.serverId === '') {
+  ): Promise<{ status: number; body: string; headers: Headers }> {
+    if (!omitWriteHeaders && opts.serverId === '') {
       throw new ZoteroError(WRITE_IDENTITY_MISSING_MESSAGE, ZOTERO_UNEXPECTED)
     }
-    const url = new URL(path, this.baseUrlWithSlash)
+    const url = absoluteUrl ? new URL(path) : new URL(path, this.baseUrlWithSlash)
     const release = await acquireSlot(this.gate, opts.signal)
     const startedAt = Date.now()
     const target = `${method} ${path}`
     this.options.sink?.info('write.attempt', target)
     try {
       using d = deadline(opts.signal, deadlineMs, ZOTERO_TIMEOUT)
-      const headers: Record<string, string> = {
-        [ZOTERO_API_VERSION_HEADER]: ZOTERO_LOCAL_API_VERSION,
-        [ZOTERO_SERVER_ID_HEADER]: opts.serverId,
-        ...extraHeaders,
-      }
-      if (opts.apiKey !== '') headers['Zotero-API-Key'] = opts.apiKey
-      if (method !== 'DELETE') headers['Content-Type'] = 'application/json'
+      const headers: Record<string, string> = omitWriteHeaders
+        ? {}
+        : {
+            [ZOTERO_API_VERSION_HEADER]: ZOTERO_LOCAL_API_VERSION,
+            [ZOTERO_SERVER_ID_HEADER]: opts.serverId,
+            ...extraHeaders,
+          }
+      if (!omitWriteHeaders && opts.apiKey !== '') headers['Zotero-API-Key'] = opts.apiKey
+      if (body !== undefined) headers['Content-Type'] = contentType
+      else if (!omitWriteHeaders && method !== 'DELETE') headers['Content-Type'] = contentType
       // If cancellation or the provider deadline won before dispatch, no write
       // can have committed and the caller must see the ordinary cancellation or
       // timeout rather than a false commit-unknown outcome.
@@ -418,11 +482,13 @@ export class ZoteroWriteHttpClient {
           throw commitUnknownOr(translated, commitSensitive)
         }
       }
-      const observedServerId = response.headers.get(ZOTERO_SERVER_ID_HEADER)
+      const observedServerId = omitWriteHeaders
+        ? null
+        : response.headers.get(ZOTERO_SERVER_ID_HEADER)
       // A response from another instance is never translated as this write's
       // refusal. This check also covers error responses, whose bodies may use
       // different wording than the read transport's identity statement.
-      if (observedServerId !== null && observedServerId !== opts.serverId) {
+      if (!omitWriteHeaders && observedServerId !== null && observedServerId !== opts.serverId) {
         void response.body?.cancel()
         throw new ZoteroError(SERVER_MISMATCH_MESSAGE, ZOTERO_SERVER_MISMATCH)
       }
@@ -454,7 +520,7 @@ export class ZoteroWriteHttpClient {
           throw commitUnknownOr(error, commitSensitive && !isPreCommitWriteStatus(response.status))
         }
       }
-      if (observedServerId === null) {
+      if (!omitWriteHeaders && observedServerId === null) {
         const error = new ZoteroError(WRITE_RESPONSE_IDENTITY_MISSING_MESSAGE, ZOTERO_UNEXPECTED)
         throw commitUnknownOr(error, commitSensitive)
       }
@@ -473,7 +539,7 @@ export class ZoteroWriteHttpClient {
         ms: Date.now() - startedAt,
         bodyChars: responseBody.length,
       })
-      return { body: responseBody, headers: response.headers }
+      return { status: response.status, body: responseBody, headers: response.headers }
     } catch (error) {
       // Commit-unknown outcomes log as ordinary failures here; their
       // distinguishing wrapper is the caller's concern.

@@ -54,6 +54,7 @@ import {
   updateItem as updateItemDomain,
   writeCapabilityUnavailableMessage,
 } from './write-domain.js'
+import { attachFile as attachFileDomain } from './write-attachments.js'
 import {
   deleteLibraryTags as deleteLibraryTagsDomain,
   restoreItems as restoreItemsDomain,
@@ -77,6 +78,8 @@ import {
 import type { WriteAuthorizer } from '../write-auth.js'
 import type { ZoteroWriteHttpClient } from '../write-http.js'
 import type {
+  ZoteroAttachFileCommittedOutcome,
+  ZoteroAttachFileRequest,
   ZoteroAttachmentLocation,
   ZoteroBrowseRequest,
   ZoteroBrowseResult,
@@ -473,6 +476,17 @@ export class LocalApiProvider implements ZoteroProvider {
     signal?: AbortSignal,
   ): Promise<ZoteroCreateItemCommittedOutcome> {
     return createItemDomain(this.writeDeps(), request, signal)
+  }
+
+  /**
+   * Create an imported-file attachment from a local file under an existing
+   * item. The domain logic lives in `local/write-attachments`; this is the seam.
+   */
+  async attachFile(
+    request: ZoteroAttachFileRequest,
+    signal?: AbortSignal,
+  ): Promise<ZoteroAttachFileCommittedOutcome> {
+    return attachFileDomain(this.writeDeps(), request, signal)
   }
 
   /**

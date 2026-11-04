@@ -13,6 +13,7 @@ import { registerGetTool } from './tools/get.js'
 import { registerRetrieveTool } from './tools/retrieve.js'
 import { registerSearchTool } from './tools/search.js'
 import { registerBatchItemsTool } from './tools/batch-items.js'
+import { registerAttachFilesTool } from './tools/attach-files.js'
 import { registerCreateCollectionTool } from './tools/create-collection.js'
 import { registerCreateItemTool } from './tools/create-item.js'
 import { registerCreateNoteTool } from './tools/create-note.js'
@@ -48,6 +49,7 @@ export function registerWriteTools(ctx: Context, service: ZoteroService): Array<
     registerUpdateCollectionTool(ctx, service),
     registerDeleteCollectionTool(ctx, service),
     registerCreateItemTool(ctx, service),
+    registerAttachFilesTool(ctx, service),
     registerUpdateItemTool(ctx, service),
     registerRestoreItemsTool(ctx, service),
     ...registerSavedSearchTools(ctx, service),

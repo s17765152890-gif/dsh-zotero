@@ -68,6 +68,8 @@ import { installShellWriteApproval } from './shell-write-approval.js'
 import { registerReadTools, registerWriteTools } from './tool-registration.js'
 import { installToolDiagnostics } from './tool-diagnostics.js'
 import type {
+  ZoteroAttachFileCommittedOutcome,
+  ZoteroAttachFileRequest,
   ZoteroAttachmentLocation,
   ZoteroBrowseRequest,
   ZoteroBrowseResult,
@@ -138,6 +140,7 @@ type ZoteroWriteMethod =
   | 'updateCollection'
   | 'deleteCollection'
   | 'createItem'
+  | 'attachFile'
   | 'updateItem'
   | 'deleteLibraryTags'
   | 'restoreItems'
@@ -749,6 +752,19 @@ export class ZoteroService extends Service {
   }
 
   /**
+   * Create an imported-file attachment from a local file under an existing item.
+   * @param request - the parent item ref, the absolute local file path, and optional title/content type.
+   * @param call - the asking write call: its plan and its tool run.
+   * @returns the created attachment's saved state, or `declined` when not approved.
+   */
+  async attachFile(
+    request: ZoteroAttachFileRequest,
+    call: ZoteroWriteCall,
+  ): Promise<ZoteroAttachFileCommittedOutcome | ZoteroWriteDeclined> {
+    return await this.dispatchWrite(call, 'attachFile', request)
+  }
+
+  /**
    * Update one item's scalar metadata fields.
    * @param request - the item ref and the closed-set field updates.
    * @param call - the asking write call: its plan and its tool run.
@@ -816,14 +832,24 @@ export class ZoteroService extends Service {
   /**
    * The confirmation gates every write passes through, in order: the session
    * approval policy (`ctx.approval`, where `never` auto-rejects and the
-   * request is audited), then the plan-review card. There is no opt-out and no
-   * config field behind either: a write that cannot clear the policy or show
-   * the user its plan does not happen. Both asks fail closed, and a missing
-   * channel refuses the write rather than letting it through unapproved.
+   * request is audited), then the plan-review card. Both asks fail closed, and
+   * a missing channel refuses the write rather than letting it through
+   * unapproved.
+   *
+   * Fork addition: `writeAutoApprove` (off by default) skips both gates for
+   * deployments that already granted the agent full trust — notably the
+   * danger-full-access preset, whose approval policy is `never` and would
+   * otherwise auto-reject every write without a way to approve it.
    * @param call - the asking write call.
    * @returns true when the write may proceed.
    */
   private async approveWrite(call: ZoteroWriteCall): Promise<boolean> {
+    if (this.config.writeAutoApprove === true) {
+      this.diagnostics.sink.info('write.gate', 'writeAutoApprove: approval gates skipped', {
+        tool: call.exec.name,
+      })
+      return true
+    }
     const policy = await requestWriteApproval(this.ctx, call)
     this.diagnostics.sink.info('write.gate', `write policy decision: ${policy}`, {
       tool: call.exec.name,

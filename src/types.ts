@@ -1125,6 +1125,41 @@ export interface ZoteroCreateItemResult {
   serverId?: string
 }
 
+/** One local file to attach to an existing item as an imported-file attachment. */
+export interface ZoteroAttachFileRequest {
+  /** The parent item the attachment is created under. */
+  item: ZoteroObjectRef
+  /** Absolute path of a file on the machine running Zotero. */
+  path: string
+  /** Attachment title; defaults to the file name. */
+  title?: string
+  /** MIME type; defaults from the file extension (application/pdf for .pdf). */
+  contentType?: string
+}
+
+export interface ZoteroAttachFileResult {
+  kind: 'applied'
+  /** The created attachment ref. */
+  ref: string
+  key: string
+  /** The parent item the attachment belongs to. */
+  parentRef: string
+  title?: string
+  filename: string
+  contentType: string
+  /** Number of bytes uploaded and registered. */
+  bytes: number
+  /** The attachment item's version. */
+  version: number
+  /** The library version the write advanced the library to. */
+  libraryVersion: number
+  serverId?: string
+}
+
+export type ZoteroAttachFileCommittedOutcome =
+  | ZoteroAttachFileResult
+  | ZoteroWriteCommittedUnverified
+
 export type ZoteroUpdatableItemField = (typeof ZOTERO_UPDATABLE_ITEM_FIELDS)[number]
 
 export interface ZoteroUpdateItemRequest {
@@ -1321,6 +1356,7 @@ export type ZoteroDeleteCollectionOutcome = ZoteroDeleteCollectionResult | Zoter
 export type ZoteroCreateItemCommittedOutcome =
   ZoteroCreateItemResult | ZoteroWriteCommittedUnverified
 export type ZoteroCreateItemOutcome = ZoteroCreateItemCommittedOutcome | ZoteroWriteDeclined
+export type ZoteroAttachFileOutcome = ZoteroAttachFileCommittedOutcome | ZoteroWriteDeclined
 export type ZoteroUpdateItemOutcome = ZoteroUpdateItemResult | ZoteroWriteDeclined
 export type ZoteroUpdateNoteOutcome = ZoteroUpdateNoteResult | ZoteroWriteDeclined
 export type ZoteroUpdateCollectionOutcome = ZoteroUpdateCollectionResult | ZoteroWriteDeclined
@@ -1512,6 +1548,17 @@ export interface ZoteroProvider {
     request: ZoteroCreateItemRequest,
     signal?: AbortSignal,
   ): Promise<ZoteroCreateItemCommittedOutcome>
+  /**
+   * Create an imported-file attachment from a local file and upload its bytes
+   * through Zotero's three-phase file protocol (authorize → upload → register).
+   * @param request - the parent item, the local file path, and optional title/content type.
+   * @param signal - caller cancellation; forwarded to the transport.
+   * @returns the created attachment's saved state, or committed-unverified.
+   */
+  attachFile?(
+    request: ZoteroAttachFileRequest,
+    signal?: AbortSignal,
+  ): Promise<ZoteroAttachFileCommittedOutcome>
   /**
    * Update one item's scalar metadata fields (read-merge-write).
    * @param request - the item ref and the closed-set field updates.

@@ -159,6 +159,7 @@ export const ZOTERO_WRITE_TOOL_NAMES = [
   'zotero_update_collection',
   'zotero_delete_collection',
   'zotero_create_item',
+  'zotero_attach_files',
   'zotero_update_item',
   'zotero_restore_items',
   'zotero_create_saved_search',

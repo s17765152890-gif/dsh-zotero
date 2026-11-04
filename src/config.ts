@@ -97,6 +97,16 @@ export interface Config {
    * that issued it). One-time keys are never persisted regardless.
    */
   writePersistKey?: Volatile<boolean>
+  /**
+   * Fork-only convenience: when true, write calls skip the session approval
+   * policy and the plan-review card and execute directly. Intended for a
+   * deployment that already granted the agent full trust (e.g. the
+   * danger-full-access permission preset, whose approval policy is `never`
+   * and would otherwise auto-reject every Zotero write). Off by default; a
+   * deployment that turns it on accepts that the model can change the
+   * library without reviewing each plan.
+   */
+  writeAutoApprove?: Volatile<boolean>
   /** Character budget for one research note body write; the converted HTML rides the batch's successful bucket (bounded by `maxResponseBytes`), and this bound keeps one pathological note from dominating a batch. */
   writeNoteMaxChars?: Volatile<number>
   /** Upper bound for items in one tags/collection-membership write's list arguments, the same scale as the write batch cap, so one call cannot fan out into many protocol batches. */
@@ -165,6 +175,7 @@ export const Config = Schema.object({
   defaultLocale: Schema.string().default('en-US').volatile(),
   writeEnabled: Schema.boolean().default(false).volatile(),
   writePersistKey: Schema.boolean().default(true).volatile(),
+  writeAutoApprove: Schema.boolean().default(false).volatile(),
   writeNoteMaxChars: Schema.number().default(65_536).volatile(),
   writeListMaxItems: Schema.number().default(50).volatile(),
   writeAuthorizeDeadlineMs: Schema.number().default(120_000).volatile(),
@@ -205,6 +216,7 @@ export interface ResolvedConfig {
   readonly defaultLocale: string
   readonly writeEnabled: boolean
   readonly writePersistKey: boolean
+  readonly writeAutoApprove: boolean
   readonly writeNoteMaxChars: number
   readonly writeListMaxItems: number
   readonly writeAuthorizeDeadlineMs: number
@@ -371,6 +383,7 @@ function assertResolvedConfig(plain: Record<string, unknown>): ResolvedConfig {
   assertNonEmpty('defaultLocale', plain.defaultLocale)
   assertBoolean('writeEnabled', plain.writeEnabled)
   assertBoolean('writePersistKey', plain.writePersistKey)
+  assertBoolean('writeAutoApprove', plain.writeAutoApprove)
   assertBoolean('webEnabled', plain.webEnabled)
   assertBoolean('enableRunInBackground', plain.enableRunInBackground)
   assertBoolean('promoteOnTimeout', plain.promoteOnTimeout)
