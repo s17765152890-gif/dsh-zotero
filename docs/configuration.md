@@ -37,6 +37,7 @@
 | `defaultLocale`            | `en-US`                      | CSL 引用语言                                                                                                                                                                  |
 | `writeEnabled`             | `false`                      | 是否注册并启用个人库写入工具                                                                                                                                                  |
 | `writePersistKey`          | `true`                       | 是否将 Always-Allow 写入密钥保存到宿主凭据管理器                                                                                                                              |
+| `writeAutoApprove`         | `false`                      | Fork 专属：跳过会话审批与计划审查卡，写入直接执行（仅建议在已授完全信任、审批策略为 never 的会话里开启；Zotero 授权仍在）                                                       |
 | `writeNoteMaxChars`        | `65536`                      | 单条研究笔记正文字符上限                                                                                                                                                      |
 | `writeListMaxItems`        | `50`                         | 列表类写入参数的条目上限：`update_item_tags`/`update_item_collections` 的 `add`/`remove`、`delete_library_tags` 的 `tags`、`create_note` 的 `collections`/`tags`/`sourceRefs` |
 | `writeAuthorizeDeadlineMs` | `120000`                     | 写入时等待 Zotero 授权弹窗的时限（毫秒）                                                                                                                                      |
@@ -59,7 +60,7 @@
 - `baseUrl` 路径必须为 `/api` 或以 `/api/` 开头；
 - `timeoutMs` 必须为正有限数；
 - 其余数值字段（并发、各类上限、`scopeListingTtlMs`、`foregroundWaitMs`、`writeNoteMaxChars`、`writeListMaxItems`、`writeAuthorizeDeadlineMs`）均必须为正整数；
-- `writeEnabled`、`writePersistKey`、`webEnabled`、`enableRunInBackground`、`promoteOnTimeout` 与 `debug` 必须为布尔值；
+- `writeEnabled`、`writePersistKey`、`writeAutoApprove`、`webEnabled`、`enableRunInBackground`、`promoteOnTimeout` 与 `debug` 必须为布尔值；
 - `provider`、`defaultStyle` 与 `defaultLocale` 必须为非空字符串。
 
 ## 配置优先级

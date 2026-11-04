@@ -37,6 +37,7 @@ All configuration fields are defined in `src/config.ts`, with default values pro
 | `defaultLocale`            | `en-US`                      | CSL citation locale                                                                                                                                                                                                                              |
 | `writeEnabled`             | `false`                      | Whether to register and enable personal library write tools                                                                                                                                                                                      |
 | `writePersistKey`          | `true`                       | Whether to persist Always-Allow write keys in the host credentials store                                                                                                                                                                         |
+| `writeAutoApprove`         | `false`                      | Fork-only: skip the session approval and plan-review cards and apply writes directly. Use only in a full-trust session whose approval policy is `never`; Zotero's own authorization still applies.                                             |
 | `writeNoteMaxChars`        | `65536`                      | Maximum characters for a research note body                                                                                                                                                                                                      |
 | `writeListMaxItems`        | `50`                         | Cap on list-shaped write arguments: `add`/`remove` for `update_item_tags`/`update_item_collections`, `tags` for `delete_library_tags`, and `collections`/`tags`/`sourceRefs` for `create_note`                                                   |
 | `writeAuthorizeDeadlineMs` | `120000`                     | Timeout in milliseconds when waiting for Zotero authorization dialog                                                                                                                                                                             |
@@ -59,7 +60,7 @@ Note: `foregroundWaitMs` controls how long foreground operations wait before pro
 - `baseUrl` path must be `/api` or start with `/api/`;
 - `timeoutMs` must be a positive finite number;
 - Every other numeric field (concurrency, the various limits, `scopeListingTtlMs`, `foregroundWaitMs`, `writeNoteMaxChars`, `writeListMaxItems`, and `writeAuthorizeDeadlineMs`) must be a positive integer;
-- `writeEnabled`, `writePersistKey`, `webEnabled`, `enableRunInBackground`, `promoteOnTimeout`, and `debug` must be booleans;
+- `writeEnabled`, `writePersistKey`, `writeAutoApprove`, `webEnabled`, `enableRunInBackground`, `promoteOnTimeout`, and `debug` must be booleans;
 - `provider`, `defaultStyle`, and `defaultLocale` must be non-empty strings.
 
 ## Configuration Priority

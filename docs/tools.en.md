@@ -459,6 +459,30 @@ zotero_create_item(itemType="journalArticle", title="Attention Is All You Need",
 
 ---
 
+## zotero_attach_files
+
+Attaches local files to existing items as imported-file attachments and drives Zotero 10's three-phase file protocol: create the attachment item (`itemType="attachment"`, `linkMode="imported_file"`, `parentItem`, `filename`, `contentType`), authorize the transfer with `POST /items/{key}/file` (`md5`, `filename`, `filesize`, `mtime` in milliseconds, `contentType`, under `If-None-Match: *`), POST the bytes to the loopback upload URL Zotero returns, then register with `upload=<uploadKey>`. Bytes reach only a URL validated as loopback.
+
+One call may carry several files (1..`writeListMaxItems`) under one plan card. Every path must be absolute on the machine running Zotero; paths and bytes never enter the model context. If the attachment item is created but a later file leg fails, the error names the created attachment key so the caller can delete or retry that item instead of blindly retrying the create.
+
+### Parameters
+
+| Parameter | Type  | Required | Description                                                                                                                                                                            |
+| --------- | ----- | -------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `files`   | array | ✓        | Entries of `{item, path, title?, contentType?}`: `item` is the parent ref (`zotero://user/0/item/<KEY>`), `path` an absolute local path, `title`/`contentType` optional (defaults from the file name and extension) |
+
+### Output
+
+Success returns `{kind: "attached", attachments: [{ref, key, parentRef, title?, filename, contentType, bytes, version, libraryVersion, serverId?}], serverId?}`; a declined plan returns `{kind: "declined"}`; an unprovable create returns `{kind: "committed-unverified", ...}` (never retried). An authorize/upload/register failure names the created attachment key and the failure.
+
+### Example
+
+```text
+zotero_attach_files(files=[{item: "zotero://user/0/item/ABCD1234", path: "E:\\papers\\paper.pdf"}])
+```
+
+---
+
 ## zotero_update_note
 
 Replaces an existing Zotero note body from Markdown. The domain reads the note version and converts Markdown to Zotero-safe HTML before issuing the PATCH; the target must have `itemType="note"`.

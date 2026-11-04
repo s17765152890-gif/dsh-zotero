@@ -459,6 +459,30 @@ zotero_create_item(itemType="journalArticle", title="Attention Is All You Need",
 
 ---
 
+## zotero_attach_files
+
+把本地文件作为 imported-file 附件挂到已有条目下，并走 Zotero 10 的三段式文件协议：先创建附件条目（`itemType="attachment"`、`linkMode="imported_file"`、`parentItem`、`filename`、`contentType`），再 `POST /items/{key}/file` 申请上传（`md5`、`filename`、`filesize`、`mtime` 毫秒、`contentType`，带 `If-None-Match: *`），把字节 POST 到 Zotero 返回的本机上传地址，最后以 `upload=<uploadKey>` 注册。上传地址只有校验为本机 loopback 后才会收到字节。
+
+一次调用可携带多条文件（1..`writeListMaxItems`），共享同一张计划确认卡。文件路径必须是运行 Zotero 的那台机器上的绝对路径；路径与字节都不进入模型上下文。若附件条目已创建而文件段失败，错误信息会带上已创建的附件 key，便于删除或重试该条目——不会盲目重试创建。
+
+### 参数
+
+| 参数    | 类型  | 必填 | 说明                                                                                                                                                                    |
+| ------- | ----- | ---- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `files` | array | ✓    | 每项为 `{item, path, title?, contentType?}`：`item` 是接收附件的条目 ref（`zotero://user/0/item/<KEY>`），`path` 为本地绝对路径，`title`/`contentType` 可选（默认取文件名与扩展名） |
+
+### 输出
+
+成功返回 `{kind: "attached", attachments: [{ref, key, parentRef, title?, filename, contentType, bytes, version, libraryVersion, serverId?}], serverId?}`；计划卡拒绝返回 `{kind: "declined"}`；创建阶段无法证明返回 `{kind: "committed-unverified", ...}`（不可重试）。若授权/上传/注册阶段失败，错误会指明已创建的附件条目 key 与失败原因。
+
+### 示例
+
+```text
+zotero_attach_files(files=[{item: "zotero://user/0/item/ABCD1234", path: "E:\\papers\\paper.pdf"}])
+```
+
+---
+
 ## zotero_update_note
 
 使用 Markdown 替换现有 Zotero 笔记正文。写入前读取笔记版本，并在 PATCH 中转换为 Zotero 安全 HTML；目标必须是 `itemType="note"`。
