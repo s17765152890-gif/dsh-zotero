@@ -23,4 +23,4 @@ local PDF bytes.
   not rebuilt algorithms; mocks stop at the `llm.stream` boundary.
 - Live Zotero and live model runs: not in the suite. Phase acceptance is a
   real `zotero_bilingual_document` call on a short paper after installing the
-  fork in the DSH profile (see `docs/scenarios.md` pack W).
+  fork in the DSH profile .
