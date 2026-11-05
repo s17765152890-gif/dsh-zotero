@@ -296,7 +296,15 @@ function classifyLines(
   let paragraph: { id: string; lines: string[]; lastY: number; lastX: number } | undefined
   const figures: { caption?: string; fragments: string[] }[] = []
   let currentFigure:
-    | { caption?: string; captionY?: number; fragments: string[]; y0: number; y1: number }
+    | {
+        caption?: string
+        captionY?: number
+        fragments: string[]
+        y0: number
+        y1: number
+        x0: number
+        x1: number
+      }
     | undefined
   const claimedImages = new Set<number>()
   let figureCount = 0
@@ -310,7 +318,9 @@ function classifyLines(
   const flushFigure = (): void => {
     if (currentFigure !== undefined && currentFigure.fragments.length > 0) {
       const text = currentFigure.fragments.join(' · ')
-      const bbox = pickFigureBbox(images, claimedImages, currentFigure.captionY, currentFigure.y0, currentFigure.y1)
+      const bbox =
+        pickFigureBbox(images, claimedImages, currentFigure.captionY, currentFigure.y0, currentFigure.y1) ??
+        labelSpanBbox(currentFigure, pageWidth, pageHeight)
       units.push({
         id: `p${page}-f${figures.length}`,
         kind: 'figure',
@@ -323,6 +333,28 @@ function classifyLines(
       figureCount += currentFigure.fragments.length
     }
     currentFigure = undefined
+  }
+
+  /**
+   * Fallback crop for vector-only figures (no raster image to match): the
+   * union of the label fragments' boxes, expanded symmetrically. Charts and
+   * tables are usually drawn around their text, so the span plus the render
+   * padding captures the body.
+   */
+  function labelSpanBbox(
+    figure: { x0: number; x1: number; y0: number; y1: number },
+    pageW: number,
+    pageH: number,
+  ): [number, number, number, number] | undefined {
+    if (!Number.isFinite(figure.x0) || !Number.isFinite(figure.x1)) return undefined
+    const expandX = 60
+    const expandY = 80
+    const x0 = Math.max(0, figure.x0 - expandX)
+    const x1 = Math.min(pageW, figure.x1 + expandX)
+    const y0 = Math.max(0, figure.y0 - expandY)
+    const y1 = Math.min(pageH, figure.y1 + expandY)
+    if (x1 - x0 < 20 || y1 - y0 < 20) return undefined
+    return [x0, y0, x1, y1]
   }
 
   /**
@@ -414,7 +446,7 @@ function classifyLines(
         flushFigure()
       } else {
         flushFigure()
-        currentFigure = { caption: text, captionY: line.y, fragments: [], y0: line.y, y1: line.y }
+        currentFigure = { caption: text, captionY: line.y, fragments: [], y0: line.y, y1: line.y, x0: line.x, x1: line.x + line.width }
         units.push({ id: `p${page}-c${units.length}`, kind: 'caption', page, text })
       }
       continue
@@ -432,10 +464,13 @@ function classifyLines(
     // the rest are routed to the current figure when one is open.
     if (inMargin) continue
     if (!looksLikeFigureLabel(text)) continue
-    if (currentFigure === undefined) currentFigure = { fragments: [], y0: line.y, y1: line.y }
-    else {
+    if (currentFigure === undefined) {
+      currentFigure = { fragments: [], y0: line.y, y1: line.y, x0: line.x, x1: line.x + line.width }
+    } else {
       currentFigure.y0 = Math.min(currentFigure.y0, line.y)
       currentFigure.y1 = Math.max(currentFigure.y1, line.y)
+      currentFigure.x0 = Math.min(currentFigure.x0, line.x)
+      currentFigure.x1 = Math.max(currentFigure.x1, line.x + line.width)
     }
     currentFigure.fragments.push(text)
   }
