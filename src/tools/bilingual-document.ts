@@ -105,46 +105,92 @@ function sessionWorkspace(exec: { agent?: { session?: { header?: { cwd?: string 
   return typeof cwd === 'string' && cwd !== '' ? cwd : process.cwd()
 }
 
-/** Resolve the model route: explicit config, then the session agent, then the default selection. */
-/** Resolve the model route; explicit config wins, then the harness default, then the session agent. */
-function resolveModel(
+/**
+ * Resolve the model route: explicit config wins, then the harness default,
+ * then the session agent. Every candidate is validated with `resolveCallConfig`
+ * before use, because agent/engine route pairs (for example an engine model id
+ * that no LLM adapter serves) are not necessarily registered LLM routes.
+ * The first working route wins; when none works the error names every tried
+ * route so the operator can pin `bilingualProvider`/`bilingualModel` explicitly.
+ */
+async function resolveModel(
   ctx: Context,
   service: ZoteroService,
   exec: { agent?: { options?: { provider?: string; model?: string; reasoningEffort?: unknown } } },
-): { selection: ModelSelection; source: 'config' | 'default' | 'agent' } {
+): Promise<{ selection: ModelSelection; source: 'config' | 'default' | 'agent' }> {
   const config = service.config
-  if (config.bilingualProvider !== '' && config.bilingualModel !== '') {
-    return {
-      selection: { provider: config.bilingualProvider, model: config.bilingualModel },
-      source: 'config',
-    }
-  }
   const defaults = (
     ctx as unknown as {
       agentDefaultModel?: { currentSelection?: () => ModelSelection | undefined }
     }
   ).agentDefaultModel
   const fallback = defaults?.currentSelection?.()
-  if (fallback !== undefined) return { selection: fallback, source: 'default' }
   const agentOptions = exec.agent?.options
-  if (
-    agentOptions?.provider !== undefined &&
-    agentOptions.provider !== '' &&
-    agentOptions?.model !== undefined &&
-    agentOptions.model !== ''
-  ) {
-    const effort = agentOptions.reasoningEffort
-    return {
-      selection: {
-        provider: agentOptions.provider,
-        model: agentOptions.model,
-        ...(typeof effort === 'string' ? { reasoningEffort: effort as never } : {}),
-      },
+  const candidates: {
+    provider?: string
+    model?: string
+    effort?: unknown
+    source: 'config' | 'default' | 'agent'
+  }[] = [
+    {
+      provider: config.bilingualProvider === '' ? undefined : config.bilingualProvider,
+      model: config.bilingualModel === '' ? undefined : config.bilingualModel,
+      source: 'config',
+    },
+    {
+      provider: fallback?.provider,
+      model: fallback?.model,
+      effort: fallback?.reasoningEffort,
+      source: 'default',
+    },
+    {
+      provider: agentOptions?.provider,
+      model: agentOptions?.model,
+      effort: agentOptions?.reasoningEffort,
       source: 'agent',
+    },
+  ]
+  const tried: string[] = []
+  const failures: string[] = []
+  const llm = ctx.llm as unknown as LlmRuntime
+  for (const candidate of candidates) {
+    if (
+      candidate.provider === undefined ||
+      candidate.provider === '' ||
+      candidate.model === undefined ||
+      candidate.model === ''
+    ) {
+      continue
+    }
+    tried.push(`${candidate.provider}/${candidate.model}`)
+    try {
+      const resolved = await llm.resolveCallConfig({
+        provider: candidate.provider,
+        model: candidate.model,
+        ...(typeof candidate.effort === 'string' ? { reasoningEffort: candidate.effort as never } : {}),
+      })
+      return {
+        selection: {
+          provider: resolved.provider,
+          model: resolved.model,
+          ...(resolved.reasoningEffort === undefined
+            ? {}
+            : { reasoningEffort: resolved.reasoningEffort as never }),
+        },
+        source: candidate.source,
+      }
+    } catch (error) {
+      failures.push(
+        `${candidate.provider}/${candidate.model}: ${
+          error instanceof Error ? error.message : String(error)
+        }`.slice(0, 200),
+      )
     }
   }
   throw new ZoteroError(
-    'No model route is available: set bilingualProvider/bilingualModel in the plugin config or select a model in the session.',
+    `No working model route was found (tried: ${tried.length > 0 ? tried.join(', ') : 'none'}). ` +
+      'Set bilingualProvider/bilingualModel in the plugin config to a route your provider serves' +
+      `${failures.length > 0 ? `; last errors: ${failures.slice(-2).join(' | ')}` : ''}.`,
     ZOTERO_UNEXPECTED,
   )
 }
@@ -214,7 +260,7 @@ export function registerBilingualDocumentTool(ctx: Context, service: ZoteroServi
           (service.config.bilingualOutputDir !== ''
             ? service.config.bilingualOutputDir
             : join(sessionWorkspace(exec as never), 'bilingual'))
-        const resolved = resolveModel(ctx, service, exec as never)
+        const resolved = await resolveModel(ctx, service, exec as never)
         try {
           const built = await buildBilingualDocument({
             pdfPath: location.path,
