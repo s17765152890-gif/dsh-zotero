@@ -142,7 +142,7 @@ zotero_attachment(ref="zotero://user/0/item/ABC123")
 
 ## zotero_bilingual_document
 
-把条目本地 PDF 变成「原文｜中文」左右对照双语阅读文档（自包含 HTML + Markdown 镜像）：逐段翻译正文、标题、图题与图/表内标签文字，译文用当前 DSH 会话模型（`ctx.llm`）。翻译按段分批、结果缓存到输出目录旁，重跑可续译；图内文字随图题挂在页面对应位置。
+把条目本地 PDF 变成「原文｜中文」左右对照双语阅读文档（自包含 HTML + Markdown 镜像）：逐段翻译正文、标题、图题与图/表内标签文字，译文用当前 DSH 会话模型（`ctx.llm`）。翻译按段分批、结果缓存到输出目录旁，重跑可续译；图内文字随图题挂在页面对应位置，页面里的位图 Figure 会被裁图并以内联图片形式嵌入 HTML 图注区。
 
 ### 参数
 
@@ -156,7 +156,7 @@ zotero_attachment(ref="zotero://user/0/item/ABC123")
 
 ### 输出
 
-`{kind: "generated", htmlPath, markdownPath, cachePath, pageCount, units, translated, untranslated, figureUnits, figureFragments, requests, failures, errors, model: {provider, model}, modelSource, elapsedMs}`；`errors` 记录前 3 条翻译失败信息供排障；`modelSource` 标明路由来源（`config`/`default`/`agent`）。
+`{kind: "generated", htmlPath, markdownPath, cachePath, pageCount, units, translated, untranslated, figureUnits, figureFragments, figureImages, requests, failures, errors, model: {provider, model}, modelSource, elapsedMs}`；`errors` 记录前 3 条翻译失败信息供排障；`modelSource` 标明路由来源（`config`/`default`/`agent`）；`figureImages` 为嵌入 HTML 的裁图数量（存于输出目录下 `figures/`）。
 
 ### 示例
 

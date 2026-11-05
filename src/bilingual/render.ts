@@ -11,6 +11,8 @@ import type { ExtractedDocument, DocUnit } from './extract.js'
 export interface RenderInput {
   document: ExtractedDocument
   translations: ReadonlyMap<string, string>
+  /** Figure unit id → relative `figures/…` image path. */
+  figureImages?: Record<string, string>
   title: string
   itemRef: string
   model: { provider: string; model: string }
@@ -42,7 +44,7 @@ export function renderHtml(input: RenderInput): string {
       const zh = translations.get(unit.id)
       if (zh === undefined) missing += 1
       else translated += 1
-      body.push(renderUnit(unit, zh))
+      body.push(renderUnit(unit, zh, input.figureImages?.[unit.id]))
     }
     body.push('</section>')
   }
@@ -74,6 +76,7 @@ export function renderHtml(input: RenderInput): string {
   .figure .pairs { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); gap: 6px 18px; font-size: 14px; }
   .figure .pairs .en { color: #444; }
   .figure .pairs .zh { color: #0b5cad; }
+  .figure img.figimg { display: block; max-width: 100%; border: 1px solid #d0d7de; border-radius: 4px; margin: 4px 0 10px; background: #fff; }
   .tag { display: inline-block; font-size: 11px; color: #6a737d; border: 1px solid #d0d7de; border-radius: 10px; padding: 0 6px; margin-right: 6px; vertical-align: 1px; }
   @media (max-width: 820px) { .row { grid-template-columns: 1fr; } .figure .pairs { grid-template-columns: 1fr; } }
   @media print { body { background: #fff; } .row { break-inside: avoid; } }
@@ -91,8 +94,8 @@ ${body.join('\n')}
 `
 }
 
-/** Render one unit as a two-column row or (for figures) a label-pair panel. */
-function renderUnit(unit: DocUnit, zh: string | undefined): string {
+/** Render one unit as a two-column row or (for figures) an image plus a label-pair panel. */
+function renderUnit(unit: DocUnit, zh: string | undefined, imagePath?: string): string {
   if (unit.kind === 'figure') {
     const pairs: string[] = []
     const labels = unit.text.split(' · ').filter((label) => label !== '')
@@ -102,7 +105,8 @@ function renderUnit(unit: DocUnit, zh: string | undefined): string {
       pairs.push(`<div class="zh">${escapeHtml(translated[index] ?? '')}</div>`)
     })
     const caption = unit.caption === undefined ? '' : `<h3>图内文字 · ${escapeHtml(unit.caption)}</h3>`
-    return `<div class="figure">${caption}<div class="pairs">${pairs.join('')}</div></div>`
+    const figure = imagePath === undefined ? '' : `<img class="figimg" src="${escapeHtml(imagePath)}" alt="${escapeHtml(unit.caption ?? 'figure')}" loading="lazy">`
+    return `<div class="figure">${caption}${figure}<div class="pairs">${pairs.join('')}</div></div>`
   }
   const translated = zh === undefined ? '<span class="tag">未译</span>' : escapeHtml(zh)
   return `<div class="row ${unit.kind}"><div class="src">${escapeHtml(unit.text)}</div><div class="dst">${translated}</div></div>`
@@ -141,6 +145,8 @@ export function renderMarkdown(input: RenderInput): string {
       if (unit.kind === 'figure') {
         lines.push('')
         lines.push(`**图内文字${unit.caption === undefined ? '' : `（${unit.caption}）`}**`)
+        const imagePath = input.figureImages?.[unit.id]
+        if (imagePath !== undefined) lines.push(`![](${imagePath})`)
         lines.push('')
         lines.push('| 原文 | 译文 |')
         lines.push('| --- | --- |')

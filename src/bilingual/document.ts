@@ -8,6 +8,7 @@
 import { mkdir, readFile, writeFile } from 'node:fs/promises'
 import { composeOutputPaths, outputRootFor } from './paths.js'
 import { extractDocument } from './extract.js'
+import { renderFigureCrops } from './images.js'
 import { renderHtml, renderMarkdown } from './render.js'
 import { translateUnits, type TranslateUnit } from './translate.js'
 import { targetLanguageLabel, type LlmRuntime, type ModelSelection } from './types.js'
@@ -47,6 +48,8 @@ export interface BilingualBuildResult {
   untranslated: number
   figureUnits: number
   figureFragments: number
+  /** Cropped figure images embedded in the HTML. */
+  figureImages: number
   requests: number
   failures: number
   /** First few translation errors, for diagnosis. */
@@ -166,8 +169,21 @@ export async function buildBilingualDocument(
     sourceLang: input.sourceLang,
     generatedAt: new Date(),
   }
-  await writeFile(paths.htmlPath, renderHtml(renderInput), 'utf8')
-  await writeFile(paths.markdownPath, renderMarkdown(renderInput), 'utf8')
+  // Crop painted figure bodies and reference them from the figure panels.
+  const crops = extracted.pages.flatMap((page) =>
+    page.units
+      .filter((unit) => unit.kind === 'figure' && unit.bbox !== undefined)
+      .map((unit) => ({
+        unitId: unit.id,
+        page: unit.page,
+        bbox: unit.bbox as [number, number, number, number],
+        pageWidth: page.width,
+        pageHeight: page.height,
+      })),
+  )
+  const figureImages = await renderFigureCrops(input.pdfPath, crops, paths.figuresDir)
+  await writeFile(paths.htmlPath, renderHtml({ ...renderInput, figureImages: Object.fromEntries(figureImages) }), 'utf8')
+  await writeFile(paths.markdownPath, renderMarkdown({ ...renderInput, figureImages: Object.fromEntries(figureImages) }), 'utf8')
 
   let translated = 0
   let untranslated = 0
@@ -191,6 +207,7 @@ export async function buildBilingualDocument(
     untranslated,
     figureUnits,
     figureFragments: extracted.figureFragments,
+    figureImages: figureImages.size,
     requests: translation.requests,
     failures: translation.failures,
     errors: translation.errors,

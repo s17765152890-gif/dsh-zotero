@@ -142,7 +142,7 @@ zotero_attachment(ref="zotero://user/0/item/ABC123")
 
 ## zotero_bilingual_document
 
-Turn an item's local PDF into a side-by-side English | Chinese reading document (self-contained HTML plus a Markdown mirror): body paragraphs, headings, captions, and figure/table label text are translated with the session's current model (`ctx.llm`). Translation is batched and cached next to the output directory so re-runs resume; figure text renders next to its caption on the same page.
+Turn an item's local PDF into a side-by-side English | Chinese reading document (self-contained HTML plus a Markdown mirror): body paragraphs, headings, captions, and figure/table label text are translated with the session's current model (`ctx.llm`). Translation is batched and cached next to the output directory so re-runs resume; figure text renders next to its caption on the same page, and painted figures are cropped and embedded as inline images in the HTML figure panel.
 
 ### Parameters
 
@@ -156,7 +156,7 @@ Turn an item's local PDF into a side-by-side English | Chinese reading document 
 
 ### Output
 
-`{kind: "generated", htmlPath, markdownPath, cachePath, pageCount, units, translated, untranslated, figureUnits, figureFragments, requests, failures, errors, model: {provider, model}, modelSource, elapsedMs}`; `errors` carries the first three translation failures for diagnosis; `modelSource` names the route's origin (`config`/`default`/`agent`).
+`{kind: "generated", htmlPath, markdownPath, cachePath, pageCount, units, translated, untranslated, figureUnits, figureFragments, figureImages, requests, failures, errors, model: {provider, model}, modelSource, elapsedMs}`; `errors` carries the first three translation failures for diagnosis; `modelSource` names the route's origin (`config`/`default`/`agent`); `figureImages` counts the cropped figures embedded in the HTML (under the output directory's `figures/`).
 
 ### Example
 

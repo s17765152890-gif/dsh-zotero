@@ -10,7 +10,7 @@
  */
 
 import { readFile } from 'node:fs/promises'
-import { getDocumentProxy } from 'unpdf'
+import { getDocumentProxy, getResolvedPDFJS } from 'unpdf'
 
 /** One `getTextContent` item projected onto the page coordinate system. */
 export interface TextFragment {
@@ -46,11 +46,20 @@ export interface DocUnit {
   text: string
   /** The figure caption a `figure` unit belongs to, when one was found. */
   caption?: string
+  /**
+   * The painted figure body in PDF user units `[x0, y0, x1, y1]`, attached
+   * when a raster image sits near this figure. The renderer crops this region
+   * and embeds it next to the translated labels.
+   */
+  bbox?: [number, number, number, number]
 }
 
 /** One page of extracted content. */
 export interface ExtractedPage {
   page: number
+  /** Page size in PDF user units. */
+  width: number
+  height: number
   units: DocUnit[]
 }
 
@@ -98,9 +107,10 @@ export async function extractDocument(
     const fragments = toFragments(content.items)
     const bodySize = dominantFontSize(fragments)
     const lines = mergeLines(fragments, bodySize)
-    const { units, figureCount } = classifyLines(lines, pageNo, bodySize, pageWidth, pageHeight)
+    const images = await imageRects(page, pageWidth, pageHeight)
+    const { units, figureCount } = classifyLines(lines, pageNo, bodySize, pageWidth, pageHeight, images)
     figureFragments += figureCount
-    pages.push({ page: pageNo, units })
+    pages.push({ page: pageNo, width: pageWidth, height: pageHeight, units })
   }
 
   return {
@@ -109,6 +119,71 @@ export async function extractDocument(
     figureFragments,
     hasText: pages.some((page) => page.units.length > 0),
   }
+}
+
+/**
+ * Painted raster-image rectangles on one page, in PDF user units. Tracks the
+ * current transformation matrix through save/restore/transform so each
+ * `paintImageXObject`/`paintInlineImageXObject` lands where the renderer puts
+ * it. Tiny icons and full-page masks are dropped: they are not figures.
+ */
+export interface ImageRect {
+  bbox: [number, number, number, number]
+}
+
+async function imageRects(
+  page: { getOperatorList: () => Promise<{ fnArray: number[]; argsArray: unknown[][] }> },
+  pageWidth: number,
+  pageHeight: number,
+): Promise<ImageRect[]> {
+  let ops: { paintImageXObject?: number; paintInlineImageXObject?: number; save?: number; restore?: number; transform?: number }
+  try {
+    const pdfjs = (await getResolvedPDFJS()) as unknown as { OPS?: Record<string, number> }
+    const ids = pdfjs.OPS ?? {}
+    ops = {
+      paintImageXObject: ids.paintImageXObject ?? 85,
+      paintInlineImageXObject: ids.paintInlineImageXObject ?? 86,
+      save: ids.save ?? 10,
+      restore: ids.restore ?? 11,
+      transform: ids.transform ?? 12,
+    }
+  } catch {
+    ops = { paintImageXObject: 85, paintInlineImageXObject: 86, save: 10, restore: 11, transform: 12 }
+  }
+  const listed = await page.getOperatorList()
+  const out: ImageRect[] = []
+  let ctm = [1, 0, 0, 1, 0, 0]
+  const stack: number[][] = []
+  const multiply = (m: number[], n: number[]): number[] => [
+    m[0]! * n[0]! + m[2]! * n[1]!,
+    m[1]! * n[0]! + m[3]! * n[1]!,
+    m[0]! * n[2]! + m[2]! * n[3]!,
+    m[1]! * n[2]! + m[3]! * n[3]!,
+    m[0]! * n[4]! + m[2]! * n[5]! + m[4]!,
+    m[1]! * n[4]! + m[3]! * n[5]! + m[5]!,
+  ]
+  for (let i = 0; i < listed.fnArray.length; i++) {
+    const fn = listed.fnArray[i]
+    const args = (listed.argsArray[i] ?? []) as number[]
+    if (fn === ops.save) stack.push([...ctm])
+    else if (fn === ops.restore) {
+      const previous = stack.pop()
+      if (previous !== undefined) ctm = previous
+    } else if (fn === ops.transform && args.length >= 6) ctm = multiply(ctm, args)
+    else if (fn === ops.paintImageXObject || fn === ops.paintInlineImageXObject) {
+      const [a, , , d, e, f] = ctm
+      const x0 = Math.min(e!, e! + a!)
+      const x1 = Math.max(e!, e! + a!)
+      const y0 = Math.min(f!, f! + d!)
+      const y1 = Math.max(f!, f! + d!)
+      const area = (x1 - x0) * (y1 - y0)
+      const pageArea = pageWidth * pageHeight
+      if (area >= 40 * 40 && area <= pageArea * 0.85) {
+        out.push({ bbox: [x0, y0, x1, y1] })
+      }
+    }
+  }
+  return out
 }
 
 /** Project pdf.js text items onto `TextFragment`s, dropping blank fragments. */
@@ -215,11 +290,15 @@ function classifyLines(
   bodySize: number,
   pageWidth: number,
   pageHeight: number,
+  images: readonly ImageRect[],
 ): Classified {
   const units: DocUnit[] = []
   let paragraph: { id: string; lines: string[]; lastY: number; lastX: number } | undefined
   const figures: { caption?: string; fragments: string[] }[] = []
-  let currentFigure: { caption?: string; fragments: string[] } | undefined
+  let currentFigure:
+    | { caption?: string; captionY?: number; fragments: string[]; y0: number; y1: number }
+    | undefined
+  const claimedImages = new Set<number>()
   let figureCount = 0
 
   const flushParagraph = (): void => {
@@ -231,17 +310,56 @@ function classifyLines(
   const flushFigure = (): void => {
     if (currentFigure !== undefined && currentFigure.fragments.length > 0) {
       const text = currentFigure.fragments.join(' · ')
+      const bbox = pickFigureBbox(images, claimedImages, currentFigure.captionY, currentFigure.y0, currentFigure.y1)
       units.push({
         id: `p${page}-f${figures.length}`,
         kind: 'figure',
         page,
         text,
         ...(currentFigure.caption === undefined ? {} : { caption: currentFigure.caption }),
+        ...(bbox === undefined ? {} : { bbox }),
       })
       figures.push(currentFigure)
       figureCount += currentFigure.fragments.length
     }
     currentFigure = undefined
+  }
+
+  /**
+   * Match a label cluster to its painted figure body: the closest raster
+   * image above the caption (captions sit below their figures), or the image
+   * overlapping the label span when no caption was found. Each image is
+   * claimed once per page so two figures never share one crop.
+   */
+  function pickFigureBbox(
+    candidates: readonly ImageRect[],
+    claimed: Set<number>,
+    captionY: number | undefined,
+    y0: number,
+    y1: number,
+  ): [number, number, number, number] | undefined {
+    let best = -1
+    let bestScore = Number.POSITIVE_INFINITY
+    candidates.forEach((image, index) => {
+      if (claimed.has(index)) return
+      const [, iy0, , iy1] = image.bbox
+      let distance: number
+      if (captionY !== undefined) {
+        if (iy0 < captionY - 60 || iy0 > captionY + 520) return
+        distance = Math.abs(iy0 - captionY) - (iy1 - iy0) * 0.1
+      } else {
+        const overlap = Math.max(0, Math.min(iy1, y1 + 30) - Math.max(iy0, y0 - 30))
+        if (overlap <= 0) return
+        distance = -overlap
+      }
+      if (distance < bestScore) {
+        bestScore = distance
+        best = index
+      }
+    })
+    if (best < 0) return undefined
+    claimed.add(best)
+    return candidates[best]!.bbox
   }
 
   for (const line of lines) {
@@ -291,11 +409,12 @@ function classifyLines(
       // caption instead of flushing them as an anonymous cluster.
       if (currentFigure !== undefined && currentFigure.caption === undefined && currentFigure.fragments.length > 0) {
         currentFigure.caption = text
+        currentFigure.captionY = line.y
         units.push({ id: `p${page}-c${units.length}`, kind: 'caption', page, text })
         flushFigure()
       } else {
         flushFigure()
-        currentFigure = { caption: text, fragments: [] }
+        currentFigure = { caption: text, captionY: line.y, fragments: [], y0: line.y, y1: line.y }
         units.push({ id: `p${page}-c${units.length}`, kind: 'caption', page, text })
       }
       continue
@@ -313,7 +432,11 @@ function classifyLines(
     // the rest are routed to the current figure when one is open.
     if (inMargin) continue
     if (!looksLikeFigureLabel(text)) continue
-    if (currentFigure === undefined) currentFigure = { fragments: [] }
+    if (currentFigure === undefined) currentFigure = { fragments: [], y0: line.y, y1: line.y }
+    else {
+      currentFigure.y0 = Math.min(currentFigure.y0, line.y)
+      currentFigure.y1 = Math.max(currentFigure.y1, line.y)
+    }
     currentFigure.fragments.push(text)
   }
   flushParagraph()

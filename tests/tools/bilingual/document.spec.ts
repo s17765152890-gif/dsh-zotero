@@ -18,6 +18,8 @@ const DOCUMENT: ExtractedDocument = {
   pages: [
     {
       page: 1,
+      width: 595,
+      height: 842,
       units: [
         { id: 'p1-h0', kind: 'heading', page: 1, text: 'Cut Off by the Tide' },
         { id: 'p1-b1', kind: 'paragraph', page: 1, text: 'People get cut off by the flooding tide.' },

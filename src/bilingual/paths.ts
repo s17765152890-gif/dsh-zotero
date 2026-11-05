@@ -7,10 +7,12 @@
 
 import { join } from 'node:path'
 
-/** Paths to the four artifacts of one bilingual document. */
+/** Paths to the artifacts of one bilingual document. */
 export interface BilingualPaths {
   /** Per-item output directory. */
   dir: string
+  /** Cropped figure PNGs live here; the HTML references them relatively. */
+  figuresDir: string
   htmlPath: string
   markdownPath: string
   cachePath: string
@@ -25,6 +27,7 @@ export function outputRootFor(root: string, itemKey: string): string {
 export function composeOutputPaths(dir: string): BilingualPaths {
   return {
     dir,
+    figuresDir: join(dir, 'figures'),
     htmlPath: join(dir, 'index.html'),
     markdownPath: join(dir, 'bilingual.md'),
     cachePath: join(dir, 'translation.json'),
