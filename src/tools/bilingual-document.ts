@@ -293,7 +293,7 @@ export function registerBilingualDocumentTool(ctx: Context, service: ZoteroServi
             requests: built.requests,
             failures: built.failures,
             errors: built.errors,
-            model: built.model,
+            model: { provider: built.model.provider, model: built.model.model },
             modelSource: resolved.source,
             elapsedMs: built.elapsedMs,
           } satisfies Output

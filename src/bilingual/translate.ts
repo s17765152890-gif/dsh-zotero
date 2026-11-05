@@ -112,21 +112,32 @@ async function translateBatch(
     `Source language: ${options.sourceLabel ?? 'English'}. Target language: ${options.targetLabel ?? 'Simplified Chinese'}.\n` +
     `Translate every item's "en" field. Return the JSON array only.\n\n${payload}`
   let text = ''
+  let finish: unknown
   const stream = llm.stream({
     provider: selection.provider,
     model: selection.model,
     ...(selection.reasoningEffort === undefined ? {} : { reasoningEffort: selection.reasoningEffort }),
     messages: [{ role: 'user', content: [{ type: 'text', text: user }] }],
     system: SYSTEM_PROMPT,
-    maxTokens: 4000,
+    maxTokens: 12000,
     ...(options.signal === undefined ? {} : { signal: options.signal }),
   })
   for await (const chunk of stream) {
-    if ((chunk as { type?: string }).type === 'text-delta') {
-      text += (chunk as { text?: string }).text ?? ''
+    const typed = chunk as { type?: string; text?: string }
+    if (typed.type === 'text-delta') {
+      text += typed.text ?? ''
+    } else if (typed.type === 'finish') {
+      finish = chunk
     }
   }
-  return parseTranslations(text)
+  try {
+    return parseTranslations(text)
+  } catch (error) {
+    const detail = error instanceof Error ? error.message : String(error)
+    throw new Error(
+      `${detail} (finish=${JSON.stringify(finish)?.slice(0, 200) ?? 'none'}, textLen=${text.length}, head=${JSON.stringify(text.slice(0, 200))})`,
+    )
+  }
 }
 
 /** Parse the model answer tolerantly: fenced JSON, prose around the array, reordered keys. */
