@@ -261,6 +261,8 @@ export function registerBilingualDocumentTool(ctx: Context, service: ZoteroServi
             ? service.config.bilingualOutputDir
             : join(sessionWorkspace(exec as never), 'bilingual'))
         const resolved = await resolveModel(ctx, service, exec as never)
+        const sessionId = (exec as unknown as { agent?: { session?: { id?: string } } }).agent
+          ?.session?.id
         try {
           const built = await buildBilingualDocument({
             pdfPath: location.path,
@@ -275,6 +277,7 @@ export function registerBilingualDocumentTool(ctx: Context, service: ZoteroServi
             ...range,
             ...(args.maxUnits === undefined ? {} : { maxUnits: args.maxUnits }),
             batchChars: service.config.bilingualBatchChars,
+            ...(sessionId === undefined ? {} : { sessionId }),
             signal: exec.signal,
           })
           return {

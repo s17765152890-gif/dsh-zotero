@@ -29,6 +29,8 @@ export interface BilingualBuildInput {
   /** Translate at most this many units (a smoke-test cap); omitted means all. */
   maxUnits?: number
   batchChars?: number
+  /** Session identity for request routing (required by session-routed adapters). */
+  sessionId?: string
   signal?: AbortSignal
 }
 
@@ -113,6 +115,7 @@ export async function buildBilingualDocument(
   const translation = await translateUnits(input.llm, input.model, missing, {
     targetLabel: targetLanguageLabel(input.targetLang),
     ...(input.batchChars === undefined ? {} : { batchChars: input.batchChars }),
+    ...(input.sessionId === undefined ? {} : { sessionId: input.sessionId }),
     ...(input.signal === undefined ? {} : { signal: input.signal }),
   })
   const translations: Record<string, string> = { ...cached }

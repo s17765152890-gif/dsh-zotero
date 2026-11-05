@@ -31,6 +31,8 @@ export interface TranslateOptions {
   batchChars?: number
   /** Units per request ceiling (defaults to 20). */
   batchUnits?: number
+  /** Session identity for request routing (required by session-routed adapters). */
+  sessionId?: string
   signal?: AbortSignal
 }
 
@@ -120,6 +122,7 @@ async function translateBatch(
     messages: [{ role: 'user', content: [{ type: 'text', text: user }] }],
     system: SYSTEM_PROMPT,
     maxTokens: 12000,
+    ...(options.sessionId === undefined ? {} : { sessionId: options.sessionId as never }),
     ...(options.signal === undefined ? {} : { signal: options.signal }),
   })
   for await (const chunk of stream) {
